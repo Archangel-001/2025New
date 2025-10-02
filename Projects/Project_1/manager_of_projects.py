@@ -1,7 +1,7 @@
 def create():
-    note = input("Enter note text: ")
+    notes = input("Enter note text: ")
     with open("notes.txt", "a") as file:
-        file.write(note + "\n")
+        file.write(notes + "\n")
     print("Note created successfully.")
 
 def delete():
@@ -11,10 +11,33 @@ def search():
     pass
 
 def close():
-    pass
+    with open("notes.txt", "r") as file:
+        notes = file.readlines()
+    if not notes:
+        print("No notes to close.")
+        return
+    
+    print("\nList of notes:")
+    for i, note in enumerate(notes, 1):
+        print(f"{i}. {note.strip()}")
+    numb = int(input("Enter note number to close: "))
+    if numb < 1 or numb > len(notes):
+        print("Invalid note number!")
+        return
+    print(f"Note #{numb} has been closed.")
 
 def show():
-    pass
+    with open("notes.txt", "r") as file:
+        notes = file.readlines()
+    if not notes:
+        print("No notes to show. You can create one.")
+        return
+    
+    print(f"\nTotal notes: {len(notes)}")
+    print("=" * 50)
+    for i, note in enumerate(notes, 1):
+        print(f"#{i}: {note.strip()}")
+    print("=" * 50)
 
 def interface():
     print('''Welcome.''')
