@@ -1,5 +1,8 @@
 def create():
-    pass
+    note = input("Enter note text: ")
+    with open("notes.txt", "a") as file:
+        file.write(note + "\n")
+    print("Note created successfully.")
 
 def delete():
     pass
@@ -37,3 +40,5 @@ def interface():
                 show()
             case _:
                 print("This command does not exist. Try again.")
+                continue
+            
