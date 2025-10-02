@@ -1,31 +1,60 @@
+#==================================================================
 def create():
     notes = input("Enter note text: ")
     with open("notes.txt", "a") as file:
         file.write(notes + "\n")
     print("Note created successfully.")
 
+#==================================================================
 def delete():
-    pass
-
-def search():
-    pass
-
-def close():
     with open("notes.txt", "r") as file:
         notes = file.readlines()
     if not notes:
-        print("No notes to close.")
+        print("No notes to delete.")
         return
     
-    print("\nList of notes:")
+    print("\nNotes list:")
     for i, note in enumerate(notes, 1):
         print(f"{i}. {note.strip()}")
-    numb = int(input("Enter note number to close: "))
+    numb = int(input("Enter note number to delete: "))
     if numb < 1 or numb > len(notes):
-        print("Invalid note number!")
+        print("Invalid note number.")
         return
-    print(f"Note #{numb} has been closed.")
+    
+    del notes[numb - 1]
+    with open("notes.txt", "w") as file:
+        for note in notes:
+            file.write(note)
+    print(f"Note #{numb} deleted successfully.")
 
+#==================================================================
+def search():
+    with open("notes.txt", "r") as file:
+        notes = file.readlines()
+    if not notes:
+        print("No notes to search.")
+        return
+    
+    search = input("Enter text to search: ").lower()
+    found = []
+    for i, note in enumerate(notes, 1):
+        if search in note.lower():
+            found.append((i, note.strip()))
+    if found:
+        print(f"\nFound notes: {len(found)}")
+        print("=" * 50)
+        for number, text in found:
+            print(f"#{number}: {text}")
+        print("=" * 50)
+    else:
+        print("No notes found with this text.")
+
+#==================================================================
+def close():
+    print("Ending session.")
+    exit()
+
+#==================================================================
 def show():
     with open("notes.txt", "r") as file:
         notes = file.readlines()
@@ -39,6 +68,7 @@ def show():
         print(f"#{i}: {note.strip()}")
     print("=" * 50)
 
+#==================================================================
 def interface():
     print('''Welcome.''')
     while True:
@@ -46,8 +76,8 @@ def interface():
         1 - Create note
         2 - Delete note
         3 - Search note
-        4 - Close note
-        5 - Show note
+        4 - Close programm
+        5 - Show notes
         Type the number for the answer.''')
         answer = input()
         match answer:
@@ -64,4 +94,6 @@ def interface():
             case _:
                 print("This command does not exist. Try again.")
                 continue
-            
+
+#==================================================================
+interface()
