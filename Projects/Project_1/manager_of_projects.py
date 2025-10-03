@@ -69,6 +69,31 @@ def show():
     print("=" * 50)
 
 #==================================================================
+def delete_2():
+    with open("notes.txt", "r") as file:
+        notes = file.readlines()
+    if not notes:
+        print("No notes to delete.")
+        return
+    
+    search = input("Enter text, which must be in files: ").lower()
+    found = []
+    for i, note in enumerate(notes):
+        if search in note.lower():
+            found.append(i)
+    if not found:
+        print("No notes found with this text.")
+    
+    else:
+        print(f"Found notes at positions: {[pos + 1 for pos in found]}")
+        for id in sorted(found, reverse = True):
+            del notes[id]
+        with open("notes.txt", "w") as file:
+            for note in notes:
+                file.write(note)
+        print(f"Notes with text '{search}' deleted successfully. Removed {len(found)} notes.")
+
+#==================================================================
 def interface():
     print('''Welcome.''')
     while True:
@@ -78,6 +103,7 @@ def interface():
         3 - Search note
         4 - Close programm
         5 - Show notes
+        6 - Delete notes which has some text in it
         Type the number for the answer.''')
         answer = input()
         match answer:
@@ -91,6 +117,8 @@ def interface():
                 close()
             case "5":
                 show()
+            case "6":
+                delete_2()
             case _:
                 print("This command does not exist. Try again.")
                 continue
