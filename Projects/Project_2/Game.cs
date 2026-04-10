@@ -1,0 +1,984 @@
+﻿public interface ICondition
+{
+    bool Check(GameState state);
+}
+
+public interface IEffect
+{
+    void Apply(GameState state);
+}
+
+public interface ICommand
+{
+    string Name { get; }
+    void Execute(GameState state, string[] args);
+}
+
+public interface IInteractable
+{
+    string Id { get; }
+    void Interact(GameState state);
+}
+
+//LMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAO
+
+public abstract class ConditionBase : ICondition
+{
+    public abstract bool Check(GameState state);
+}
+
+public abstract class EffectBase : IEffect
+{
+    public abstract void Apply(GameState state);
+}
+
+public abstract class CommandBase : ICommand
+{
+    public abstract string Name { get; }
+    public abstract void Execute(GameState state, string[] args);
+}
+
+public abstract class GameEventBase
+{
+    private ICondition _condition;
+    private List<IEffect> _effects;
+    private bool _isOneTime;
+    private bool _fired = false;
+    protected GameEventBase(ICondition condition, List<IEffect> effects, bool isOneTime = false)
+    {
+        _condition = condition;
+        _effects = effects;
+        _isOneTime = isOneTime;
+    }
+    public void TryFire(GameState state)
+    {
+        if (_isOneTime && _fired) return;
+        if (!_condition.Check(state)) return;
+
+        foreach (var effect in _effects)
+            effect.Apply(state);
+
+        _fired = true;
+    }
+}
+
+//LMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAO
+
+public class GameState
+{
+    public int Health = 100;
+    public bool IsAlive => Health > 0;
+    public bool IsGameOver = false;
+    public string EndingId = "";
+    public int TurnCount = 0;
+    public string CurrentLocationId = "Медблок";
+
+    public List<string> Inventory = new List<string>();
+    public Dictionary<string, bool> Flags = new Dictionary<string, bool>();
+    public List<string> Log = new List<string>();
+
+    public void AddItem(string item)
+    {
+        if (!Inventory.Contains(item))
+            Inventory.Add(item);
+    }
+
+    public void RemoveItem(string item)
+    {
+        Inventory.Remove(item);
+    }
+
+    public bool HasItem(string item)
+    {
+        return Inventory.Contains(item);
+    }
+
+    public void SetFlag(string flag, bool value = true)
+    {
+        Flags[flag] = value;
+    }
+
+    public bool GetFlag(string flag)
+    {
+        return Flags.ContainsKey(flag) && Flags[flag];
+    }
+
+    public void Damage(int amount)
+    {
+        Health -= amount;
+        if (Health <= 0)
+        {
+            Health = 0;
+            TriggerEnding("Тугодум");
+        }
+    }
+
+    public void Heal(int amount)
+    {
+        Health += amount;
+        if (Health > 100)
+            Health = 100;
+    }
+
+    public void TriggerEnding(string endingId)
+    {
+        IsGameOver = true;
+        EndingId = endingId;
+    }
+
+    public void AddLog(string message)
+    {
+        Log.Add(message);
+    }
+}
+
+//LMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAO
+
+public class HasItemCondition : ConditionBase
+{
+    private string _item;
+    public HasItemCondition(string item) { _item = item; }
+    public override bool Check(GameState state)
+    {
+        return state.HasItem(_item);
+    }
+}
+
+public class FlagCondition : ConditionBase
+{
+    private string _flag;
+    private bool _expected;
+    public FlagCondition(string flag, bool expected = true) { _flag = flag; _expected = expected; }
+    public override bool Check(GameState state)
+    {
+        return state.GetFlag(_flag) == _expected;
+    }
+}
+
+public class HealthCondition : ConditionBase
+{
+    private string _op;
+    private int _value;
+    public HealthCondition(string op, int value) { _op = op; _value = value; }
+    public override bool Check(GameState state)
+    {
+        if (_op == "<=") return state.Health <= _value;
+        if (_op == ">=") return state.Health >= _value;
+        if (_op == "==") return state.Health == _value;
+        return false;
+    }
+}
+
+public class TurnCountCondition : ConditionBase
+{
+    private string _op;
+    private int _value;
+    public TurnCountCondition(string op, int value) { _op = op; _value = value; }
+    public override bool Check(GameState state)
+    {
+        if (_op == ">=") return state.TurnCount >= _value;
+        if (_op == "==") return state.TurnCount == _value;
+        return false;
+    }
+}
+
+public class AlwaysTrue : ConditionBase
+{
+    public override bool Check(GameState state) { return true; }
+}
+
+public class AndCondition : ConditionBase
+{
+    private ICondition _a;
+    private ICondition _b;
+    public AndCondition(ICondition a, ICondition b) { _a = a; _b = b; }
+    public override bool Check(GameState state)
+    {
+        return _a.Check(state) && _b.Check(state);
+    }
+}
+
+public class OrCondition : ConditionBase
+{
+    private ICondition _a;
+    private ICondition _b;
+    public OrCondition(ICondition a, ICondition b) { _a = a; _b = b; }
+    public override bool Check(GameState state)
+    {
+        return _a.Check(state) || _b.Check(state);
+    }
+}
+
+public class NotCondition : ConditionBase
+{
+    private ICondition _inner;
+    public NotCondition(ICondition inner) { _inner = inner; }
+    public override bool Check(GameState state)
+    {
+        return !_inner.Check(state);
+    }
+}
+
+//LMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAO
+
+public class AddItemEffect : EffectBase
+{
+    private string _item;
+    public AddItemEffect(string item) { _item = item; }
+    public override void Apply(GameState state)
+    {
+        state.AddItem(_item);
+        state.AddLog("Получен предмет: " + _item);
+    }
+}
+
+public class RemoveItemEffect : EffectBase
+{
+    private string _item;
+    public RemoveItemEffect(string item) { _item = item; }
+    public override void Apply(GameState state)
+    {
+        state.RemoveItem(_item);
+    }
+}
+
+public class SetFlagEffect : EffectBase
+{
+    private string _flag;
+    private bool _value;
+    public SetFlagEffect(string flag, bool value = true) { _flag = flag; _value = value; }
+    public override void Apply(GameState state)
+    {
+        state.SetFlag(_flag, _value);
+    }
+}
+
+public class DamageEffect : EffectBase
+{
+    private int _amount;
+    public DamageEffect(int amount) { _amount = amount; }
+    public override void Apply(GameState state)
+    {
+        state.Damage(_amount);
+        state.AddLog("Получен урон: " + _amount);
+    }
+}
+
+public class HealEffect : EffectBase
+{
+    private int _amount;
+    public HealEffect(int amount) { _amount = amount; }
+    public override void Apply(GameState state)
+    {
+        state.Heal(_amount);
+        state.AddLog("Восстановлено здоровье: " + _amount);
+    }
+}
+
+public class LogEffect : EffectBase
+{
+    private string _message;
+    public LogEffect(string message) { _message = message; }
+    public override void Apply(GameState state)
+    {
+        state.AddLog(_message);
+    }
+}
+
+public class ChangeLocationEffect : EffectBase
+{
+    private string _locationId;
+    public ChangeLocationEffect(string locationId) { _locationId = locationId; }
+    public override void Apply(GameState state)
+    {
+        state.CurrentLocationId = _locationId;
+    }
+}
+
+public class AddExitEffect : EffectBase
+{
+    private string _fromId;
+    private string _direction;
+    private string _toId;
+    private Dictionary<string, Location> _locations;
+    public AddExitEffect(string fromId, string direction, string toId, Dictionary<string, Location> locations)
+    {
+        _fromId = fromId;
+        _direction = direction;
+        _toId = toId;
+        _locations = locations;
+    }
+    public override void Apply(GameState state)
+    {
+        if (_locations.ContainsKey(_fromId))
+            _locations[_fromId].AddExit(_direction, _toId);
+    }
+}
+
+public class TriggerEndingEffect : EffectBase
+{
+    private string _endingId;
+    public TriggerEndingEffect(string endingId) { _endingId = endingId; }
+    public override void Apply(GameState state)
+    {
+        state.TriggerEnding(_endingId);
+    }
+}
+
+//LMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAO
+
+public class OnEnterLocationEvent : GameEventBase
+{
+    public OnEnterLocationEvent(ICondition condition, List<IEffect> effects, bool isOneTime = false)
+        : base(condition, effects, isOneTime) { }
+}
+
+public class OnTurnEvent : GameEventBase
+{
+    public OnTurnEvent(ICondition condition, List<IEffect> effects)
+        : base(condition, effects, false) { }
+}
+
+public class OneTimeEvent : GameEventBase
+{
+    public OneTimeEvent(ICondition condition, List<IEffect> effects)
+        : base(condition, effects, true) { }
+}
+
+//LMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAO
+
+public class DialogueLine // вспомогательный класс для диалогов c Балкиным, да и в общем с NPC
+{
+    public ICondition Condition;
+    public string Text;
+    public List<IEffect> Effects;
+    public DialogueLine(ICondition condition, string text, List<IEffect> effects = null)
+    {
+        Condition = condition;
+        Text = text;
+        Effects = effects ?? new List<IEffect>();
+    }
+}
+
+public class Chest : IInteractable
+{
+    public string Id { get; }
+    private string _name;
+    private ICondition _condition;
+    private List<IEffect> _effects;
+    private string _lockedMessage;
+    private bool _opened = false;
+    public Chest(string id, string name, ICondition condition, List<IEffect> effects, string lockedMessage = "Заперто.")
+    {
+        Id = id;
+        _name = name;
+        _condition = condition;
+        _effects = effects;
+        _lockedMessage = lockedMessage;
+    }
+
+    public void Interact(GameState state)
+    {
+        if (_opened)
+        {
+            Console.WriteLine(_name + ": уже открыт и пуст.");
+            return;
+        }
+        if (_condition != null && !_condition.Check(state))
+        {
+            Console.WriteLine(_lockedMessage);
+            return;
+        }
+        foreach (var effect in _effects)
+            effect.Apply(state);
+        _opened = true;
+    }
+}
+
+public class Door : IInteractable
+{
+    public string Id { get; }
+    private string _name;
+    private ICondition _condition;
+    private List<IEffect> _effects;
+    private string _lockedMessage;
+    private bool _opened = false;
+    public Door(string id, string name, ICondition condition, List<IEffect> effects, string lockedMessage = "Дверь заперта.")
+    {
+        Id = id;
+        _name = name;
+        _condition = condition;
+        _effects = effects;
+        _lockedMessage = lockedMessage;
+    }
+    public void Interact(GameState state)
+    {
+        if (_opened)
+        {
+            Console.WriteLine(_name + ": уже открыта.");
+            return;
+        }
+        if (!_condition.Check(state))
+        {
+            Console.WriteLine(_lockedMessage);
+            return;
+        }
+        foreach (var effect in _effects)
+            effect.Apply(state);
+        _opened = true;
+        Console.WriteLine(_name + ": открыта.");
+    }
+}
+
+public class Trap : IInteractable
+{
+    public string Id { get; }
+    private string _name;
+    private List<IEffect> _effects;
+    private string _triggerMessage;
+    private bool _triggered = false;
+    public Trap(string id, string name, List<IEffect> effects, string triggerMessage = "Ловушка сработала!")
+    {
+        Id = id;
+        _name = name;
+        _effects = effects;
+        _triggerMessage = triggerMessage;
+    }
+    public void Interact(GameState state)
+    {
+        if (_triggered)
+        {
+            Console.WriteLine(_name + ": уже не опасна.");
+            return;
+        }
+        Console.WriteLine(_triggerMessage);
+        foreach (var effect in _effects)
+            effect.Apply(state);
+        _triggered = true;
+    }
+}
+
+public class NPC : IInteractable
+{
+    public string Id { get; }
+    private string _name;
+    private List<DialogueLine> _dialogues;
+    public NPC(string id, string name, List<DialogueLine> dialogues)
+    {
+        Id = id;
+        _name = name;
+        _dialogues = dialogues;
+    }
+    public void Interact(GameState state)
+    {
+        foreach (var line in _dialogues)
+        {
+            if (line.Condition.Check(state))
+            {
+                Console.WriteLine(_name + ": " + line.Text);
+                foreach (var effect in line.Effects)
+                    effect.Apply(state);
+                return;
+            }
+        }
+        Console.WriteLine(_name + " молчит.");
+    }
+}
+
+//LMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAO
+
+public class Location
+{
+    public string Id { get; }
+    public string Name { get; }
+    public string Description { get; }
+    private Dictionary<string, string> _exits = new Dictionary<string, string>();
+    private List<IInteractable> _objects = new List<IInteractable>();
+    private List<GameEventBase> _events = new List<GameEventBase>();
+    public Location(string id, string name, string description)
+    {
+        Id = id;
+        Name = name;
+        Description = description;
+    }
+
+    public void AddExit(string direction, string locationId)
+    {
+        _exits[direction] = locationId;
+    }
+
+    public Dictionary<string, string> GetExits()
+    {
+        return _exits;
+    }
+
+    public bool HasExit(string direction)
+    {
+        return _exits.ContainsKey(direction);
+    }
+
+    public string GetExit(string direction)
+    {
+        return _exits[direction];
+    }
+
+    public void AddObject(IInteractable obj)
+    {
+        _objects.Add(obj);
+    }
+
+    public IInteractable FindObject(string id)
+    {
+        foreach (var obj in _objects)
+            if (obj.Id == id) return obj;
+        return null;
+    }
+
+    public List<IInteractable> GetObjects()
+    {
+        return _objects;
+    }
+
+    public void AddEvent(GameEventBase ev)
+    {
+        _events.Add(ev);
+    }
+
+    public void FireEvents(GameState state)
+    {
+        foreach (var ev in _events)
+            ev.TryFire(state);
+    }
+}
+
+//LMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAO
+
+public class Quest
+{
+    public string Name { get; }
+    public string Description { get; }
+    public bool IsCompleted { get; private set; } = false;
+    private ICondition _completionCondition;
+    private ICondition _visibilityCondition;
+    public Quest(string name, string description, ICondition completionCondition, ICondition visibilityCondition = null)
+    {
+        Name = name;
+        Description = description;
+        _completionCondition = completionCondition;
+        _visibilityCondition = visibilityCondition;
+    }
+    public bool IsVisible(GameState state)
+    {
+        if (_visibilityCondition == null) return true;
+        return _visibilityCondition.Check(state);
+    }
+    public void Update(GameState state)
+    {
+        if (!IsCompleted)
+            IsCompleted = _completionCondition.Check(state);
+    }
+}
+
+//LMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAO
+
+public class HelpCommand : CommandBase
+{
+    private List<ICommand> _commands;
+    public override string Name => "help";
+    public HelpCommand(List<ICommand> commands) { _commands = commands; }
+    public override void Execute(GameState state, string[] args)
+    {
+        Console.WriteLine("--- Команды ---");
+        foreach (var cmd in _commands)
+            Console.WriteLine(cmd.Name);
+    }
+}
+
+public class LookCommand : CommandBase
+{
+    private Dictionary<string, Location> _locations;
+    public override string Name => "look";
+    public LookCommand(Dictionary<string, Location> locations) { _locations = locations; }
+    public override void Execute(GameState state, string[] args)
+    {
+        var loc = _locations[state.CurrentLocationId];
+        Console.WriteLine("=== " + loc.Name + " ===");
+        Console.WriteLine(loc.Description);
+
+        Console.WriteLine("Объекты: ");
+        foreach (var obj in loc.GetObjects())
+            Console.WriteLine("  - " + obj.Id);
+
+        Console.WriteLine("Выходы: ");
+        foreach (var exit in loc.GetExits())
+            Console.WriteLine("  " + exit.Key + " -> " + exit.Value);
+    }
+}
+
+public class GoCommand : CommandBase
+{
+    private Dictionary<string, Location> _locations;
+    public override string Name => "go";
+    public GoCommand(Dictionary<string, Location> locations) { _locations = locations; }
+    public override void Execute(GameState state, string[] args)
+    {
+        if (args.Length == 0)
+        {
+            Console.WriteLine("Куда идти? Пример: go север");
+            return;
+        }
+        var loc = _locations[state.CurrentLocationId];
+        string direction = args[0];
+        if (!loc.HasExit(direction))
+        {
+            Console.WriteLine("Туда нельзя пройти.");
+            return;
+        }
+        state.CurrentLocationId = loc.GetExit(direction);
+        _locations[state.CurrentLocationId].FireEvents(state);
+        Console.WriteLine("Вы перешли: " + direction);
+    }
+}
+
+public class InteractCommand : CommandBase // взаимодействие с объектом по id
+{
+    private Dictionary<string, Location> _locations;
+    public override string Name => "interact";
+    public InteractCommand(Dictionary<string, Location> locations) { _locations = locations; }
+    public override void Execute(GameState state, string[] args)
+    {
+        if (args.Length == 0)
+        {
+            Console.WriteLine("С чем взаимодействовать? Пример: interact балка");
+            return;
+        }
+        var loc = _locations[state.CurrentLocationId];
+        var obj = loc.FindObject(args[0]);
+        if (obj == null)
+        {
+            Console.WriteLine("Объект не найден: " + args[0]);
+            return;
+        }
+        obj.Interact(state);
+    }
+}
+
+public class InvCommand : CommandBase
+{
+    public override string Name => "inv";
+    public override void Execute(GameState state, string[] args)
+    {
+        if (state.Inventory.Count == 0)
+        {
+            Console.WriteLine("Инвентарь пуст.");
+            return;
+        }
+        Console.WriteLine("--- Инвентарь ---");
+        foreach (var item in state.Inventory)
+            Console.WriteLine("  - " + item);
+    }
+}
+
+public class StatusCommand : CommandBase
+{
+    public override string Name => "status";
+    public override void Execute(GameState state, string[] args)
+    {
+        Console.WriteLine("Здоровье: " + state.Health);
+        Console.WriteLine("Ход: " + state.TurnCount);
+        Console.WriteLine("До взрыва: " + (60 - state.TurnCount) + " ходов");
+    }
+}
+
+public class QuestsCommand : CommandBase
+{
+    private List<Quest> _quests;
+    public override string Name => "quests";
+    public QuestsCommand(List<Quest> quests) { _quests = quests; }
+    public override void Execute(GameState state, string[] args)
+    {
+        Console.WriteLine("--- Задания ---");
+        foreach (var quest in _quests)
+        {
+            if (!quest.IsVisible(state)) continue;
+            string status = quest.IsCompleted ? "[x]" : "[ ]";
+            Console.WriteLine(status + " " + quest.Name + ": " + quest.Description);
+        }
+    }
+}
+
+public class LogCommand : CommandBase
+{
+    public override string Name => "log";
+    public override void Execute(GameState state, string[] args)
+    {
+        Console.WriteLine("--- Журнал ---");
+        int start = Math.Max(0, state.Log.Count - 10);
+        for (int i = start; i < state.Log.Count; i++)
+            Console.WriteLine(state.Log[i]);
+    }
+}
+
+//LMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAO
+
+public class Game
+{
+    private GameState _state;
+    private Dictionary<string, Location> _locations;
+    private Dictionary<string, ICommand> _commands;
+    private List<Quest> _quests;
+    private List<GameEventBase> _globalEvents;
+    public Game(GameState state, Dictionary<string, Location> locations,
+                Dictionary<string, ICommand> commands, List<Quest> quests,
+                List<GameEventBase> globalEvents)
+    {
+        _state = state;
+        _locations = locations;
+        _commands = commands;
+        _quests = quests;
+        _globalEvents = globalEvents;
+    }
+    public void ProcessTurn(string input)
+    {
+        string[] parts = input.Trim().ToLower().Split(' ');
+        string commandName = parts[0];
+        string[] args = new string[parts.Length - 1];
+        for (int i = 1; i < parts.Length; i++)
+            args[i - 1] = parts[i];
+        if (_commands.ContainsKey(commandName))
+            _commands[commandName].Execute(_state, args);
+        else
+            Console.WriteLine("Неизвестная команда. Введите help.");
+        if (_state.IsGameOver) return;
+        _state.TurnCount++;
+        _locations[_state.CurrentLocationId].FireEvents(_state);
+        foreach (var ev in _globalEvents)
+            ev.TryFire(_state);
+        foreach (var quest in _quests)
+            quest.Update(_state);
+        foreach (var message in _state.Log)
+            Console.WriteLine(message);
+        _state.Log.Clear();
+    }
+
+    public void PrintEnding()
+    {
+        Console.WriteLine();
+        switch (_state.EndingId)
+        {
+            case "Герой":
+                Console.WriteLine("Вы починили реактор и вышли вместе с Балкиным. Комплекс спасён.");
+                break;
+            case "Беглец":
+                Console.WriteLine("Вы сбежали через аварийный выход. Реактор взорвался. Балкин погиб.");
+                break;
+            case "Тугодум":
+                Console.WriteLine("Время вышло. Реактор взорвался. Вы не успели.");
+                break;
+        }
+    }
+}
+
+//LMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAO
+
+public static class WorldBuilder
+{
+    public static (Dictionary<string, Location> locations, List<Quest> quests, List<GameEventBase> globalEvents)
+        Build()
+    {
+        var locations = new Dictionary<string, Location>();
+
+        // медблок (СТАРТ)
+        var medblok = new Location("Медблок", "Медблок", "Медицинский блок комплекса. Аварийное освещение мигает.");
+        medblok.AddObject(new Chest(
+            "шкаф", "Аптечный шкаф",
+            new AlwaysTrue(),
+            new List<IEffect> { new AddItemEffect("Аптечка"), new AddItemEffect("Гаечный ключ") }
+        ));
+        medblok.AddObject(new Door(
+            "вентиляция", "Вентиляционная решётка",
+            new HasItemCondition("Гаечный ключ"),
+            new List<IEffect>
+            {
+                new LogEffect("Вы откручиваете решётку. Виден тёмный лаз."),
+                new AddExitEffect("Медблок", "в лаз", "Аварийный выход", locations)
+            },
+            "Решётка прикручена болтами. Нужен инструмент."
+        ));
+        locations["Медблок"] = medblok;
+
+        // тёмный коридор
+        var corridor = new Location("Коридор", "Тёмный коридор", "Длинный тёмный коридор. Без фонарика здесь опасно.");
+        corridor.AddObject(new Trap(
+            "балка", "Упавшая балка",
+            new List<IEffect> { new DamageEffect(20), new LogEffect("Балка придавила вас!") },
+            "Вы задели балку — она падает!"
+        ));
+        corridor.AddObject(new Chest(
+            "ящик", "Ящик техника",
+            new HasItemCondition("Карточка У1"),
+            new List<IEffect> { new AddItemEffect("Карточка У2") },
+            "Ящик заперт. Нужна карточка У1."
+        ));
+        corridor.AddEvent(new OnTurnEvent(
+            new NotCondition(new HasItemCondition("Фонарик")),
+            new List<IEffect> { new DamageEffect(10), new LogEffect("Темнота дезориентирует вас. -10 HP") }
+        ));
+        locations["Коридор"] = corridor;
+
+        // реакторный зал
+        var reactor = new Location("Реакторный зал", "Реакторный зал", "Повреждённый реактор гудит. Панель управления мигает красным.");
+        reactor.AddObject(new Chest(
+            "панель", "Панель реактора",
+            new AlwaysTrue(),
+            new List<IEffect>
+            {
+                new AddItemEffect("Боровый стержень"),
+                new SetFlagEffect("ReactorChecked"),
+                new LogEffect("Вы осмотрели реактор. Нужны: Боровый стержень + Графитовый наконечник.")
+            }
+        ));
+        reactor.AddObject(new Door(
+            "реактор", "Реактор",
+            new AndCondition(new HasItemCondition("Боровый стержень"), new HasItemCondition("Графитовый наконечник")),
+            new List<IEffect>
+            {
+                new RemoveItemEffect("Боровый стержень"),
+                new RemoveItemEffect("Графитовый наконечник"),
+                new SetFlagEffect("ReactorFixed"),
+                new AddExitEffect("Реакторный зал", "юг", "Главный гейт", locations),
+                new LogEffect("Реактор стабилизирован! Путь к шлюзу открыт.")
+            },
+            "Не хватает компонентов для ремонта."
+        ));
+        locations["Реакторный зал"] = reactor;
+
+        // аварийный выход
+        var emergency = new Location("Аварийный выход", "Аварийный выход", "Узкий лаз ведёт наружу.");
+        emergency.AddEvent(new OnEnterLocationEvent(
+            new AlwaysTrue(),
+            new List<IEffect> { new TriggerEndingEffect("Беглец") },
+            isOneTime: true
+        ));
+        locations["Аварийный выход"] = emergency;
+
+        // главный гейт
+        var gate = new Location("Главный гейт", "Главный гейт", "Массивная бронедверь. За ней видно небо.");
+        gate.AddObject(new Door(
+            "шлюз", "Эвакуационный шлюз",
+            new HasItemCondition("Карточка У3"),
+            new List<IEffect> { new TriggerEndingEffect("Герой") },
+            "Нужна карточка У3."
+        ));
+        locations["Главный гейт"] = gate;
+
+        // связи между локациями
+        medblok.AddExit("север", "Коридор");
+        corridor.AddExit("юг", "Медблок");
+        corridor.AddExit("восток", "Реакторный зал");
+        reactor.AddExit("запад", "Коридор");
+
+        // Балкин — в коридоре
+        corridor.AddObject(new NPC(
+            "балкин", "Балкин",
+            new List<DialogueLine>
+            {
+                new DialogueLine(
+                    new FlagCondition("BalkinHealed"),
+                    "Спасибо. Держи карточку У3 и наконечник.",
+                    new List<IEffect> { new AddItemEffect("Карточка У3"), new AddItemEffect("Графитовый наконечник") }
+                ),
+                new DialogueLine(
+                    new HasItemCondition("Аптечка"),
+                    "Аптечка... пожалуйста...",
+                    new List<IEffect>
+                    {
+                        new RemoveItemEffect("Аптечка"),
+                        new SetFlagEffect("BalkinHealed"),
+                        new LogEffect("Вы вылечили Балкина.")
+                    }
+                ),
+                new DialogueLine(
+                    new AlwaysTrue(),
+                    "Мне нужна аптечка... найди её в медблоке."
+                )
+            }
+        ));
+
+        // квесты
+        var quests = new List<Quest>
+        {
+            new Quest(
+                "Оценить ущерб",
+                "Осмотреть панель реактора.",
+                new FlagCondition("ReactorChecked")
+            ),
+            new Quest(
+                "Стабилизировать реактор",
+                "Найти компоненты и починить реактор.",
+                new FlagCondition("ReactorFixed"),
+                new FlagCondition("ReactorChecked")
+            ),
+            new Quest(
+                "Выбраться из комплекса",
+                "Найти путь на поверхность.",
+                new OrCondition(new FlagCondition("PlayerLeft"), new FlagCondition("ReactorFixed"))
+            )
+        };
+
+        // глобальные события — таймер реактора
+        var globalEvents = new List<GameEventBase>
+        {
+            new OneTimeEvent(
+                new TurnCountCondition(">=", 40),
+                new List<IEffect> { new LogEffect("⚠ ВНИМАНИЕ: до взрыва реактора осталось 20 ходов!") }
+            ),
+            new OneTimeEvent(
+                new AndCondition(new TurnCountCondition(">=", 60), new NotCondition(new FlagCondition("ReactorFixed"))),
+                new List<IEffect> { new TriggerEndingEffect("Тугодум"), new LogEffect("Реактор взорвался.") }
+            )
+        };
+
+        return (locations, quests, globalEvents);
+    }
+}
+
+//LMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAO
+
+// ===== ТОЧКА ВХОДА =====
+
+var state = new GameState();
+var (locations, quests, globalEvents) = WorldBuilder.Build();
+
+// регистрация команд
+var commandList = new List<ICommand>();
+var commands = new Dictionary<string, ICommand>();
+
+void Register(ICommand cmd) { commandList.Add(cmd); commands[cmd.Name] = cmd; }
+
+Register(new HelpCommand(commandList));
+Register(new LookCommand(locations));
+Register(new GoCommand(locations));
+Register(new InteractCommand(locations));
+Register(new InvCommand());
+Register(new StatusCommand());
+Register(new QuestsCommand(quests));
+Register(new LogCommand());
+
+var game = new Game(state, locations, commands, quests, globalEvents);
+
+// вступление
+Console.WriteLine("=== КОМПЛЕКС «АРХАНГЕЛ» ===");
+Console.WriteLine("Реактор повреждён. У вас 60 ходов. Введите help.");
+Console.WriteLine();
+
+// главный цикл
+while (!state.IsGameOver)
+{
+    Console.Write("> ");
+    string input = Console.ReadLine();
+    if (string.IsNullOrWhiteSpace(input)) continue;
+    game.ProcessTurn(input);
+}
+
+game.PrintEnding();
