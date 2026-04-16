@@ -1,4 +1,6 @@
-﻿public interface ICondition
+﻿// ===== ИНТЕРФЕЙСЫ =====
+
+public interface ICondition
 {
     bool Check(GameState state);
 }
@@ -22,6 +24,8 @@ public interface IInteractable
 
 //LMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAO
 
+// ===== АБСТРАКТНЫЕ КЛАССЫ =====
+
 public abstract class ConditionBase : ICondition
 {
     public abstract bool Check(GameState state);
@@ -38,18 +42,21 @@ public abstract class CommandBase : ICommand
     public abstract void Execute(GameState state, string[] args);
 }
 
+// базовый класс событий — хранит условие, эффекты и логику одноразовости
 public abstract class GameEventBase
 {
     private ICondition _condition;
     private List<IEffect> _effects;
     private bool _isOneTime;
     private bool _fired = false;
+
     protected GameEventBase(ICondition condition, List<IEffect> effects, bool isOneTime = false)
     {
         _condition = condition;
         _effects = effects;
         _isOneTime = isOneTime;
     }
+
     public void TryFire(GameState state)
     {
         if (_isOneTime && _fired) return;
@@ -64,6 +71,8 @@ public abstract class GameEventBase
 
 //LMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAO
 
+// ===== СОСТОЯНИЕ ИГРЫ =====
+
 public class GameState
 {
     public int Health = 100;
@@ -77,6 +86,7 @@ public class GameState
     public Dictionary<string, bool> Flags = new Dictionary<string, bool>();
     public List<string> Log = new List<string>();
 
+    // инвентарь
     public void AddItem(string item)
     {
         if (!Inventory.Contains(item))
@@ -93,6 +103,7 @@ public class GameState
         return Inventory.Contains(item);
     }
 
+    // флаги
     public void SetFlag(string flag, bool value = true)
     {
         Flags[flag] = value;
@@ -103,6 +114,7 @@ public class GameState
         return Flags.ContainsKey(flag) && Flags[flag];
     }
 
+    // здоровье
     public void Damage(int amount)
     {
         Health -= amount;
@@ -120,6 +132,7 @@ public class GameState
             Health = 100;
     }
 
+    // завершение и журнал
     public void TriggerEnding(string endingId)
     {
         IsGameOver = true;
@@ -134,10 +147,15 @@ public class GameState
 
 //LMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAO
 
+// ===== УСЛОВИЯ =====
+
+// простые условия
 public class HasItemCondition : ConditionBase
 {
     private string _item;
+
     public HasItemCondition(string item) { _item = item; }
+
     public override bool Check(GameState state)
     {
         return state.HasItem(_item);
@@ -148,7 +166,9 @@ public class FlagCondition : ConditionBase
 {
     private string _flag;
     private bool _expected;
+
     public FlagCondition(string flag, bool expected = true) { _flag = flag; _expected = expected; }
+
     public override bool Check(GameState state)
     {
         return state.GetFlag(_flag) == _expected;
@@ -159,7 +179,9 @@ public class HealthCondition : ConditionBase
 {
     private string _op;
     private int _value;
+
     public HealthCondition(string op, int value) { _op = op; _value = value; }
+
     public override bool Check(GameState state)
     {
         if (_op == "<=") return state.Health <= _value;
@@ -173,7 +195,9 @@ public class TurnCountCondition : ConditionBase
 {
     private string _op;
     private int _value;
+
     public TurnCountCondition(string op, int value) { _op = op; _value = value; }
+
     public override bool Check(GameState state)
     {
         if (_op == ">=") return state.TurnCount >= _value;
@@ -187,11 +211,14 @@ public class AlwaysTrue : ConditionBase
     public override bool Check(GameState state) { return true; }
 }
 
+// составные условия
 public class AndCondition : ConditionBase
 {
     private ICondition _a;
     private ICondition _b;
+
     public AndCondition(ICondition a, ICondition b) { _a = a; _b = b; }
+
     public override bool Check(GameState state)
     {
         return _a.Check(state) && _b.Check(state);
@@ -202,7 +229,9 @@ public class OrCondition : ConditionBase
 {
     private ICondition _a;
     private ICondition _b;
+
     public OrCondition(ICondition a, ICondition b) { _a = a; _b = b; }
+
     public override bool Check(GameState state)
     {
         return _a.Check(state) || _b.Check(state);
@@ -212,7 +241,9 @@ public class OrCondition : ConditionBase
 public class NotCondition : ConditionBase
 {
     private ICondition _inner;
+
     public NotCondition(ICondition inner) { _inner = inner; }
+
     public override bool Check(GameState state)
     {
         return !_inner.Check(state);
@@ -221,10 +252,15 @@ public class NotCondition : ConditionBase
 
 //LMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAO
 
+// ===== ЭФФЕКТЫ =====
+
+// инвентарь
 public class AddItemEffect : EffectBase
 {
     private string _item;
+
     public AddItemEffect(string item) { _item = item; }
+
     public override void Apply(GameState state)
     {
         state.AddItem(_item);
@@ -235,28 +271,36 @@ public class AddItemEffect : EffectBase
 public class RemoveItemEffect : EffectBase
 {
     private string _item;
+
     public RemoveItemEffect(string item) { _item = item; }
+
     public override void Apply(GameState state)
     {
         state.RemoveItem(_item);
     }
 }
 
+// флаги
 public class SetFlagEffect : EffectBase
 {
     private string _flag;
     private bool _value;
+
     public SetFlagEffect(string flag, bool value = true) { _flag = flag; _value = value; }
+
     public override void Apply(GameState state)
     {
         state.SetFlag(_flag, _value);
     }
 }
 
+// здоровье
 public class DamageEffect : EffectBase
 {
     private int _amount;
+
     public DamageEffect(int amount) { _amount = amount; }
+
     public override void Apply(GameState state)
     {
         state.Damage(_amount);
@@ -267,7 +311,9 @@ public class DamageEffect : EffectBase
 public class HealEffect : EffectBase
 {
     private int _amount;
+
     public HealEffect(int amount) { _amount = amount; }
+
     public override void Apply(GameState state)
     {
         state.Heal(_amount);
@@ -275,20 +321,26 @@ public class HealEffect : EffectBase
     }
 }
 
+// журнал
 public class LogEffect : EffectBase
 {
     private string _message;
+
     public LogEffect(string message) { _message = message; }
+
     public override void Apply(GameState state)
     {
         state.AddLog(_message);
     }
 }
 
+// перемещение
 public class ChangeLocationEffect : EffectBase
 {
     private string _locationId;
+
     public ChangeLocationEffect(string locationId) { _locationId = locationId; }
+
     public override void Apply(GameState state)
     {
         state.CurrentLocationId = _locationId;
@@ -301,6 +353,7 @@ public class AddExitEffect : EffectBase
     private string _direction;
     private string _toId;
     private Dictionary<string, Location> _locations;
+
     public AddExitEffect(string fromId, string direction, string toId, Dictionary<string, Location> locations)
     {
         _fromId = fromId;
@@ -308,6 +361,7 @@ public class AddExitEffect : EffectBase
         _toId = toId;
         _locations = locations;
     }
+
     public override void Apply(GameState state)
     {
         if (_locations.ContainsKey(_fromId))
@@ -315,10 +369,13 @@ public class AddExitEffect : EffectBase
     }
 }
 
+// концовка
 public class TriggerEndingEffect : EffectBase
 {
     private string _endingId;
+
     public TriggerEndingEffect(string endingId) { _endingId = endingId; }
+
     public override void Apply(GameState state)
     {
         state.TriggerEnding(_endingId);
@@ -327,18 +384,23 @@ public class TriggerEndingEffect : EffectBase
 
 //LMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAO
 
+// ===== СОБЫТИЯ =====
+
+// срабатывает при входе в локацию
 public class OnEnterLocationEvent : GameEventBase
 {
     public OnEnterLocationEvent(ICondition condition, List<IEffect> effects, bool isOneTime = false)
         : base(condition, effects, isOneTime) { }
 }
 
+// срабатывает каждый ход
 public class OnTurnEvent : GameEventBase
 {
     public OnTurnEvent(ICondition condition, List<IEffect> effects)
         : base(condition, effects, false) { }
 }
 
+// срабатывает ровно один раз
 public class OneTimeEvent : GameEventBase
 {
     public OneTimeEvent(ICondition condition, List<IEffect> effects)
@@ -347,11 +409,15 @@ public class OneTimeEvent : GameEventBase
 
 //LMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAO
 
-public class DialogueLine // вспомогательный класс для диалогов c Балкиным, да и в общем с NPC
+// ===== ОБЪЕКТЫ ВЗАИМОДЕЙСТВИЯ =====
+
+// вспомогательный класс для диалогов NPC
+public class DialogueLine
 {
     public ICondition Condition;
     public string Text;
     public List<IEffect> Effects;
+
     public DialogueLine(ICondition condition, string text, List<IEffect> effects = null)
     {
         Condition = condition;
@@ -360,6 +426,7 @@ public class DialogueLine // вспомогательный класс для д
     }
 }
 
+// контейнер — открывается один раз, может требовать условие
 public class Chest : IInteractable
 {
     public string Id { get; }
@@ -368,6 +435,7 @@ public class Chest : IInteractable
     private List<IEffect> _effects;
     private string _lockedMessage;
     private bool _opened = false;
+
     public Chest(string id, string name, ICondition condition, List<IEffect> effects, string lockedMessage = "Заперто.")
     {
         Id = id;
@@ -395,6 +463,7 @@ public class Chest : IInteractable
     }
 }
 
+// дверь — блокирует переход до выполнения условия
 public class Door : IInteractable
 {
     public string Id { get; }
@@ -403,6 +472,7 @@ public class Door : IInteractable
     private List<IEffect> _effects;
     private string _lockedMessage;
     private bool _opened = false;
+
     public Door(string id, string name, ICondition condition, List<IEffect> effects, string lockedMessage = "Дверь заперта.")
     {
         Id = id;
@@ -411,6 +481,7 @@ public class Door : IInteractable
         _effects = effects;
         _lockedMessage = lockedMessage;
     }
+
     public void Interact(GameState state)
     {
         if (_opened)
@@ -430,6 +501,7 @@ public class Door : IInteractable
     }
 }
 
+// ловушка — одноразовая, после срабатывания неактивна
 public class Trap : IInteractable
 {
     public string Id { get; }
@@ -437,6 +509,7 @@ public class Trap : IInteractable
     private List<IEffect> _effects;
     private string _triggerMessage;
     private bool _triggered = false;
+
     public Trap(string id, string name, List<IEffect> effects, string triggerMessage = "Ловушка сработала!")
     {
         Id = id;
@@ -444,6 +517,7 @@ public class Trap : IInteractable
         _effects = effects;
         _triggerMessage = triggerMessage;
     }
+
     public void Interact(GameState state)
     {
         if (_triggered)
@@ -458,17 +532,20 @@ public class Trap : IInteractable
     }
 }
 
+// NPC — выбирает первую подходящую реплику по условию
 public class NPC : IInteractable
 {
     public string Id { get; }
     private string _name;
     private List<DialogueLine> _dialogues;
+
     public NPC(string id, string name, List<DialogueLine> dialogues)
     {
         Id = id;
         _name = name;
         _dialogues = dialogues;
     }
+
     public void Interact(GameState state)
     {
         foreach (var line in _dialogues)
@@ -487,14 +564,18 @@ public class NPC : IInteractable
 
 //LMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAO
 
+// ===== ЛОКАЦИЯ =====
+
 public class Location
 {
     public string Id { get; }
     public string Name { get; }
     public string Description { get; }
+
     private Dictionary<string, string> _exits = new Dictionary<string, string>();
     private List<IInteractable> _objects = new List<IInteractable>();
     private List<GameEventBase> _events = new List<GameEventBase>();
+
     public Location(string id, string name, string description)
     {
         Id = id;
@@ -502,6 +583,7 @@ public class Location
         Description = description;
     }
 
+    // выходы
     public void AddExit(string direction, string locationId)
     {
         _exits[direction] = locationId;
@@ -522,6 +604,7 @@ public class Location
         return _exits[direction];
     }
 
+    // объекты
     public void AddObject(IInteractable obj)
     {
         _objects.Add(obj);
@@ -539,6 +622,7 @@ public class Location
         return _objects;
     }
 
+    // события
     public void AddEvent(GameEventBase ev)
     {
         _events.Add(ev);
@@ -553,13 +637,17 @@ public class Location
 
 //LMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAO
 
+// ===== КВЕСТ =====
+
 public class Quest
 {
     public string Name { get; }
     public string Description { get; }
     public bool IsCompleted { get; private set; } = false;
+
     private ICondition _completionCondition;
     private ICondition _visibilityCondition;
+
     public Quest(string name, string description, ICondition completionCondition, ICondition visibilityCondition = null)
     {
         Name = name;
@@ -567,11 +655,13 @@ public class Quest
         _completionCondition = completionCondition;
         _visibilityCondition = visibilityCondition;
     }
+
     public bool IsVisible(GameState state)
     {
         if (_visibilityCondition == null) return true;
         return _visibilityCondition.Check(state);
     }
+
     public void Update(GameState state)
     {
         if (!IsCompleted)
@@ -581,11 +671,17 @@ public class Quest
 
 //LMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAO
 
+// ===== КОМАНДЫ =====
+
+// help — список команд
 public class HelpCommand : CommandBase
 {
     private List<ICommand> _commands;
+
     public override string Name => "help";
+
     public HelpCommand(List<ICommand> commands) { _commands = commands; }
+
     public override void Execute(GameState state, string[] args)
     {
         Console.WriteLine("--- Команды ---");
@@ -594,11 +690,15 @@ public class HelpCommand : CommandBase
     }
 }
 
+// look — описание текущей локации
 public class LookCommand : CommandBase
 {
     private Dictionary<string, Location> _locations;
+
     public override string Name => "look";
+
     public LookCommand(Dictionary<string, Location> locations) { _locations = locations; }
+
     public override void Execute(GameState state, string[] args)
     {
         var loc = _locations[state.CurrentLocationId];
@@ -615,11 +715,15 @@ public class LookCommand : CommandBase
     }
 }
 
+// go — переход в другую локацию
 public class GoCommand : CommandBase
 {
     private Dictionary<string, Location> _locations;
+
     public override string Name => "go";
+
     public GoCommand(Dictionary<string, Location> locations) { _locations = locations; }
+
     public override void Execute(GameState state, string[] args)
     {
         if (args.Length == 0)
@@ -627,24 +731,31 @@ public class GoCommand : CommandBase
             Console.WriteLine("Куда идти? Пример: go север");
             return;
         }
+
         var loc = _locations[state.CurrentLocationId];
         string direction = args[0];
+
         if (!loc.HasExit(direction))
         {
             Console.WriteLine("Туда нельзя пройти.");
             return;
         }
+
         state.CurrentLocationId = loc.GetExit(direction);
         _locations[state.CurrentLocationId].FireEvents(state);
         Console.WriteLine("Вы перешли: " + direction);
     }
 }
 
-public class InteractCommand : CommandBase // взаимодействие с объектом по id
+// interact — взаимодействие с объектом по id
+public class InteractCommand : CommandBase
 {
     private Dictionary<string, Location> _locations;
+
     public override string Name => "interact";
+
     public InteractCommand(Dictionary<string, Location> locations) { _locations = locations; }
+
     public override void Execute(GameState state, string[] args)
     {
         if (args.Length == 0)
@@ -652,20 +763,25 @@ public class InteractCommand : CommandBase // взаимодействие с о
             Console.WriteLine("С чем взаимодействовать? Пример: interact балка");
             return;
         }
+
         var loc = _locations[state.CurrentLocationId];
         var obj = loc.FindObject(args[0]);
+
         if (obj == null)
         {
             Console.WriteLine("Объект не найден: " + args[0]);
             return;
         }
+
         obj.Interact(state);
     }
 }
 
+// inv — инвентарь
 public class InvCommand : CommandBase
 {
     public override string Name => "inv";
+
     public override void Execute(GameState state, string[] args)
     {
         if (state.Inventory.Count == 0)
@@ -679,9 +795,11 @@ public class InvCommand : CommandBase
     }
 }
 
+// status — здоровье и счётчик ходов
 public class StatusCommand : CommandBase
 {
     public override string Name => "status";
+
     public override void Execute(GameState state, string[] args)
     {
         Console.WriteLine("Здоровье: " + state.Health);
@@ -690,11 +808,15 @@ public class StatusCommand : CommandBase
     }
 }
 
+// quests — журнал заданий
 public class QuestsCommand : CommandBase
 {
     private List<Quest> _quests;
+
     public override string Name => "quests";
+
     public QuestsCommand(List<Quest> quests) { _quests = quests; }
+
     public override void Execute(GameState state, string[] args)
     {
         Console.WriteLine("--- Задания ---");
@@ -707,9 +829,11 @@ public class QuestsCommand : CommandBase
     }
 }
 
+// log — последние события
 public class LogCommand : CommandBase
 {
     public override string Name => "log";
+
     public override void Execute(GameState state, string[] args)
     {
         Console.WriteLine("--- Журнал ---");
@@ -721,6 +845,8 @@ public class LogCommand : CommandBase
 
 //LMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAO
 
+// ===== ИГРОВОЙ МИР =====
+
 public class Game
 {
     private GameState _state;
@@ -728,6 +854,7 @@ public class Game
     private Dictionary<string, ICommand> _commands;
     private List<Quest> _quests;
     private List<GameEventBase> _globalEvents;
+
     public Game(GameState state, Dictionary<string, Location> locations,
                 Dictionary<string, ICommand> commands, List<Quest> quests,
                 List<GameEventBase> globalEvents)
@@ -738,6 +865,8 @@ public class Game
         _quests = quests;
         _globalEvents = globalEvents;
     }
+
+    // один ход игры
     public void ProcessTurn(string input)
     {
         string[] parts = input.Trim().ToLower().Split(' ');
@@ -745,22 +874,29 @@ public class Game
         string[] args = new string[parts.Length - 1];
         for (int i = 1; i < parts.Length; i++)
             args[i - 1] = parts[i];
+
         if (_commands.ContainsKey(commandName))
             _commands[commandName].Execute(_state, args);
         else
             Console.WriteLine("Неизвестная команда. Введите help.");
+
         if (_state.IsGameOver) return;
+
         _state.TurnCount++;
         _locations[_state.CurrentLocationId].FireEvents(_state);
+
         foreach (var ev in _globalEvents)
             ev.TryFire(_state);
+
         foreach (var quest in _quests)
             quest.Update(_state);
+
         foreach (var message in _state.Log)
             Console.WriteLine(message);
         _state.Log.Clear();
     }
 
+    // вывод концовки
     public void PrintEnding()
     {
         Console.WriteLine();
@@ -781,6 +917,8 @@ public class Game
 
 //LMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAOLMAO
 
+// ===== СБОРКА МИРА =====
+
 public static class WorldBuilder
 {
     public static (Dictionary<string, Location> locations, List<Quest> quests, List<GameEventBase> globalEvents)
@@ -788,31 +926,70 @@ public static class WorldBuilder
     {
         var locations = new Dictionary<string, Location>();
 
-        // медблок (СТАРТ)
-        var medblok = new Location("Медблок", "Медблок", "Медицинский блок комплекса. Аварийное освещение мигает.");
+        // медблок — стартовая локация
+        // fix 3: добавлен фонарик в шкаф
+        var medblok = new Location("Медблок", "Медблок",
+            "Медицинский блок комплекса. Аварийное освещение мигает. На стене висит схема эвакуации.");
         medblok.AddObject(new Chest(
             "шкаф", "Аптечный шкаф",
             new AlwaysTrue(),
-            new List<IEffect> { new AddItemEffect("Аптечка"), new AddItemEffect("Гаечный ключ") }
+            new List<IEffect>
+            {
+                new AddItemEffect("Аптечка"),
+                new AddItemEffect("Фонарик"),
+                new AddItemEffect("Гаечный ключ")
+            }
         ));
+        // fix 4: вентиляция добавляет выход "север" — то же направление что проверяет GoCommand
         medblok.AddObject(new Door(
             "вентиляция", "Вентиляционная решётка",
             new HasItemCondition("Гаечный ключ"),
             new List<IEffect>
             {
-                new LogEffect("Вы откручиваете решётку. Виден тёмный лаз."),
-                new AddExitEffect("Медблок", "в лаз", "Аварийный выход", locations)
+                new LogEffect("Вы откручиваете решётку. Виден тёмный лаз на север."),
+                new AddExitEffect("Медблок", "север", "Аварийный выход", locations)
             },
             "Решётка прикручена болтами. Нужен инструмент."
         ));
         locations["Медблок"] = medblok;
 
+        // склад — новая промежуточная локация между медблоком и коридором
+        // fix 5: усложнение карты — склад с карточкой У1
+        var storage = new Location("Склад", "Склад",
+            "Захламлённый склад оборудования. Стеллажи с ящиками, часть повалена. Тускло светит аварийный фонарь.");
+        storage.AddObject(new Chest(
+            "стеллаж", "Стеллаж с инструментами",
+            new AlwaysTrue(),
+            new List<IEffect> { new AddItemEffect("Карточка У1") }
+        ));
+        storage.AddObject(new Chest(
+            "аптечка_склад", "Настенная аптечка",
+            new AlwaysTrue(),
+            new List<IEffect> { new AddItemEffect("Аптечка"), new LogEffect("Вы нашли ещё одну аптечку.") }
+        ));
+        locations["Склад"] = storage;
+
         // тёмный коридор
-        var corridor = new Location("Коридор", "Тёмный коридор", "Длинный тёмный коридор. Без фонарика здесь опасно.");
-        corridor.AddObject(new Trap(
+        // fix 1: балка — OnEnterLocationEvent (одноразовое), после падения становится обычным объектом
+        // fix 6: урон от темноты снижен с 10 до 5
+        var corridor = new Location("Коридор", "Тёмный коридор",
+            "Длинный тёмный коридор. Аварийное освещение не работает. Что-то скрипит в темноте.");
+        corridor.AddEvent(new OnEnterLocationEvent(
+            new AlwaysTrue(),
+            new List<IEffect>
+            {
+                new DamageEffect(15),
+                new SetFlagEffect("BeamFell"),
+                new LogEffect("Потолочная балка не выдерживает и падает! Вы получаете 15 урона.")
+            },
+            isOneTime: true
+        ));
+        // балка после падения — просто объект для осмотра, не активная ловушка
+        corridor.AddObject(new Chest(
             "балка", "Упавшая балка",
-            new List<IEffect> { new DamageEffect(20), new LogEffect("Балка придавила вас!") },
-            "Вы задели балку — она падает!"
+            new FlagCondition("BeamFell"),
+            new List<IEffect> { new LogEffect("Тяжёлая металлическая балка. Уже не опасна, но мешает пройти.") },
+            "Балка ещё не упала."
         ));
         corridor.AddObject(new Chest(
             "ящик", "Ящик техника",
@@ -820,14 +997,32 @@ public static class WorldBuilder
             new List<IEffect> { new AddItemEffect("Карточка У2") },
             "Ящик заперт. Нужна карточка У1."
         ));
+        // fix 6: урон 5 за ход вместо 10
         corridor.AddEvent(new OnTurnEvent(
             new NotCondition(new HasItemCondition("Фонарик")),
-            new List<IEffect> { new DamageEffect(10), new LogEffect("Темнота дезориентирует вас. -10 HP") }
+            new List<IEffect> { new DamageEffect(5), new LogEffect("Темнота дезориентирует вас. -5 HP") }
         ));
         locations["Коридор"] = corridor;
 
+        // технический отсек — новая локация с графитовым наконечником
+        // fix 5: усложнение карты
+        var techRoom = new Location("Техотсек", "Технический отсек",
+            "Небольшое помещение с трубопроводами и щитками управления. Пахнет горелой изоляцией.");
+        techRoom.AddObject(new Chest(
+            "щиток", "Технический щиток",
+            new HasItemCondition("Карточка У2"),
+            new List<IEffect>
+            {
+                new AddItemEffect("Графитовый наконечник"),
+                new LogEffect("За щитком нашёлся графитовый наконечник.")
+            },
+            "Щиток заперт на карточку У2."
+        ));
+        locations["Техотсек"] = techRoom;
+
         // реакторный зал
-        var reactor = new Location("Реакторный зал", "Реакторный зал", "Повреждённый реактор гудит. Панель управления мигает красным.");
+        var reactor = new Location("Реакторный зал", "Реакторный зал",
+            "Огромное помещение. В центре — повреждённый реактор. Панель управления мигает красным.");
         reactor.AddObject(new Chest(
             "панель", "Панель реактора",
             new AlwaysTrue(),
@@ -840,7 +1035,10 @@ public static class WorldBuilder
         ));
         reactor.AddObject(new Door(
             "реактор", "Реактор",
-            new AndCondition(new HasItemCondition("Боровый стержень"), new HasItemCondition("Графитовый наконечник")),
+            new AndCondition(
+                new HasItemCondition("Боровый стержень"),
+                new HasItemCondition("Графитовый наконечник")
+            ),
             new List<IEffect>
             {
                 new RemoveItemEffect("Боровый стержень"),
@@ -853,8 +1051,9 @@ public static class WorldBuilder
         ));
         locations["Реакторный зал"] = reactor;
 
-        // аварийный выход
-        var emergency = new Location("Аварийный выход", "Аварийный выход", "Узкий лаз ведёт наружу.");
+        // аварийный выход — сюда ведёт вентиляция из медблока
+        var emergency = new Location("Аварийный выход", "Аварийный выход",
+            "Узкий вентиляционный лаз выводит за периметр комплекса.");
         emergency.AddEvent(new OnEnterLocationEvent(
             new AlwaysTrue(),
             new List<IEffect> { new TriggerEndingEffect("Беглец") },
@@ -863,7 +1062,8 @@ public static class WorldBuilder
         locations["Аварийный выход"] = emergency;
 
         // главный гейт
-        var gate = new Location("Главный гейт", "Главный гейт", "Массивная бронедверь. За ней видно небо.");
+        var gate = new Location("Главный гейт", "Главный гейт",
+            "Массивная бронедверь эвакуационного шлюза. За толстым стеклом видно небо.");
         gate.AddObject(new Door(
             "шлюз", "Эвакуационный шлюз",
             new HasItemCondition("Карточка У3"),
@@ -873,20 +1073,38 @@ public static class WorldBuilder
         locations["Главный гейт"] = gate;
 
         // связи между локациями
-        medblok.AddExit("север", "Коридор");
-        corridor.AddExit("юг", "Медблок");
+        medblok.AddExit("восток", "Склад");
+        storage.AddExit("запад", "Медблок");
+        storage.AddExit("север", "Коридор");
+        corridor.AddExit("юг", "Склад");
         corridor.AddExit("восток", "Реакторный зал");
+        corridor.AddExit("запад", "Техотсек");
+        techRoom.AddExit("восток", "Коридор");
         reactor.AddExit("запад", "Коридор");
+        // выход "север" из медблока добавляется через вентиляцию динамически
 
-        // Балкин — в коридоре
+        // fix 2: Балкин — реплика "спасибо" убрана, лечение и выдача предметов в одном взаимодействии
+        // порядок проверок: сначала "уже вылечен и предметы ещё не взяты", потом "есть аптечка", потом дефолт
         corridor.AddObject(new NPC(
             "балкин", "Балкин",
             new List<DialogueLine>
             {
                 new DialogueLine(
-                    new FlagCondition("BalkinHealed"),
-                    "Спасибо. Держи карточку У3 и наконечник.",
-                    new List<IEffect> { new AddItemEffect("Карточка У3"), new AddItemEffect("Графитовый наконечник") }
+                    new AndCondition(
+                        new FlagCondition("BalkinHealed"),
+                        new NotCondition(new FlagCondition("BalkinGaveItems"))
+                    ),
+                    "Спасибо... держи карточку У3 и наконечник. Удачи.",
+                    new List<IEffect>
+                    {
+                        new AddItemEffect("Карточка У3"),
+                        new AddItemEffect("Графитовый наконечник"),
+                        new SetFlagEffect("BalkinGaveItems")
+                    }
+                ),
+                new DialogueLine(
+                    new FlagCondition("BalkinGaveItems"),
+                    "Иди. У тебя мало времени."
                 ),
                 new DialogueLine(
                     new HasItemCondition("Аптечка"),
@@ -895,12 +1113,12 @@ public static class WorldBuilder
                     {
                         new RemoveItemEffect("Аптечка"),
                         new SetFlagEffect("BalkinHealed"),
-                        new LogEffect("Вы вылечили Балкина.")
+                        new LogEffect("Вы вылечили Балкина. Он благодарен.")
                     }
                 ),
                 new DialogueLine(
                     new AlwaysTrue(),
-                    "Мне нужна аптечка... найди её в медблоке."
+                    "Мне нужна аптечка... найди её в медблоке или на складе."
                 )
             }
         ));
@@ -922,7 +1140,7 @@ public static class WorldBuilder
             new Quest(
                 "Выбраться из комплекса",
                 "Найти путь на поверхность.",
-                new OrCondition(new FlagCondition("PlayerLeft"), new FlagCondition("ReactorFixed"))
+                new OrCondition(new FlagCondition("Escaped"), new FlagCondition("ReactorFixed"))
             )
         };
 
@@ -934,7 +1152,10 @@ public static class WorldBuilder
                 new List<IEffect> { new LogEffect("⚠ ВНИМАНИЕ: до взрыва реактора осталось 20 ходов!") }
             ),
             new OneTimeEvent(
-                new AndCondition(new TurnCountCondition(">=", 60), new NotCondition(new FlagCondition("ReactorFixed"))),
+                new AndCondition(
+                    new TurnCountCondition(">=", 60),
+                    new NotCondition(new FlagCondition("ReactorFixed"))
+                ),
                 new List<IEffect> { new TriggerEndingEffect("Тугодум"), new LogEffect("Реактор взорвался.") }
             )
         };
